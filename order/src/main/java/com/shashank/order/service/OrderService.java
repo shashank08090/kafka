@@ -4,7 +4,10 @@ import com.shashank.comman.entity.Item;
 import com.shashank.comman.entity.Order;
 import com.shashank.order.entity.ItemDAO;
 import com.shashank.order.entity.OrderDAO;
+import com.shashank.order.producer.KafkaProducer;
 import com.shashank.order.repository.OrderRepository;
+import lombok.extern.slf4j.Slf4j;
+//import org.apache.kafka.clients.producer.KafkaProducer;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -15,12 +18,15 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class OrderService {
     private final OrderRepository orderRepository ;
-
-    public OrderService(OrderRepository orderRepository) {
+    private final KafkaProducer kafkaProducer;
+    public OrderService(OrderRepository orderRepository, KafkaProducer kafkaProducer) {
         this.orderRepository = orderRepository;
+        this.kafkaProducer = kafkaProducer;
     }
+
 
     public OrderDAO save(OrderDAO orderDAO){
         return orderRepository.save(orderDAO);
@@ -29,6 +35,10 @@ public class OrderService {
     List<OrderDAO> orderList = generateNewOrders(orderNum,itemNum);
     orderRepository.saveAll(orderList);
     List<Order> newOrderList = ListOrderDAOtoKafka(orderList);
+      newOrderList.forEach((order)->{
+          log.warn("sending order to kafka orderDetails{}",order);
+          kafkaProducer.sendOrder(order.getOrderNumber(),order);
+      });
     return newOrderList;
     }
 
